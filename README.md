@@ -18,7 +18,8 @@ git config lfs.customtransfer.lfs-agent.concurrent true
 git config lfs.standalonetransferagent lfs-agent
 ```
 
-Ensure the LFS_API_KEY environment variable is set before performing LFS operations:
+Ensure the LFS_API_KEY and LFS_LAMBDA_FINCTION_URL environment variables are set before performing LFS operations:
 ```
 export LFS_API_KEY=your-secret-api-key
+export LFS_LAMBDA_FINCTION_URL=url-to-your-lfs-s3-lambda function
 ```
