@@ -8,11 +8,13 @@ cd git-lfs-transfer-agent
 go mod init git-lfs-transfer-agent
 go build -o lfs-transfer-agent main.go
 sudo cp lfs-transfer-agent /usr/local/bin/
+sudo chmod +x /usr/local/bin/lfs-transfer-agent
 ```
 
 Then set the following Git LFS configuration in your repository: 
 ```
 git config lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-transfer-agent
+git config lfs.customtransfer.lfs-agent.path /home/jovyan/work/GitHub/git-lfs-transfer-agent
 git config lfs.customtransfer.lfs-agent.args ""
 git config lfs.customtransfer.lfs-agent.concurrent true
 git config lfs.standalonetransferagent lfs-agent
