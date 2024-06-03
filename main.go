@@ -5,9 +5,7 @@ import (
     "fmt"
     "io"
     "log"
-    "net/http"
     "os"
-    "time"
 )
 
 type TransferRequest struct {
@@ -37,7 +35,13 @@ type TransferResponse struct {
 func main() {
     decoder := json.NewDecoder(os.Stdin)
     encoder := json.NewEncoder(os.Stdout)
-
+    
+    // Get the base URL from the environment variable
+    baseURL := os.Getenv("LFS_LAMBDA_FUNCTION_URL")
+    if baseURL == "" {
+        log.Fatalf("Environment variable LAMBDA_FUNCTION_URL is not set.")
+    }
+    
     for {
         var req TransferRequest
         if err := decoder.Decode(&req); err == io.EOF {
@@ -50,9 +54,9 @@ func main() {
         for _, obj := range req.Objects {
             var actionUrl string
             if req.Operation == "download" {
-                actionUrl = fmt.Sprintf("https://your-lambda-function-url?oid=%s", obj.Oid)
+                actionUrl = fmt.Sprintf("https://%s?oid=%s", baseURL, obj.Oid)
             } else if req.Operation == "upload" {
-                actionUrl = fmt.Sprintf("https://your-lambda-function-url?oid=%s", obj.Oid)
+                actionUrl = fmt.Sprintf("https://%s?oid=%s", baseURL, obj.Oid)
             }
 
             res.Objects = append(res.Objects, struct {
