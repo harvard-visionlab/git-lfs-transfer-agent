@@ -52,6 +52,30 @@ func handleInit(event InitEvent) {
 }
 
 func handleUpload(event TransferEvent, svc *s3.S3) {
+    loggingEnabled := os.Getenv("LFS_LOGGING") == "true"
+    
+    // Set log output to stdout
+    log.SetOutput(os.Stdout)
+    
+    // Check if the object already exists
+    key := fmt.Sprintf("%s/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
+    headObjInput := &s3.HeadObjectInput{
+        Bucket: aws.String(os.Getenv("LFS_S3_BUCKET")),
+        Key:    aws.String(key),
+    }
+
+    headObjOutput, err := svc.HeadObject(headObjInput)
+    if err == nil && *headObjOutput.ContentLength == event.Size {
+        if loggingEnabled {
+            log.Printf("oid %s already exists at key %s, skipping upload\n", event.Oid, key)
+        }
+        // The object exists and the size matches, no need to upload
+        response := CompleteEvent{Event: "complete", Oid: event.Oid}
+        sendResponse(response)
+        return
+    }
+
+    // Proceed to upload the object
     file, err := os.Open(event.Path)
     if err != nil {
         response := CompleteEvent{
@@ -70,7 +94,6 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
     }
     defer file.Close()
 
-    key := fmt.Sprintf("%s/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
     _, err = svc.PutObject(&s3.PutObjectInput{
         Bucket: aws.String(os.Getenv("LFS_S3_BUCKET")),
         Key:    aws.String(key),
@@ -164,14 +187,6 @@ func handleDownload(event TransferEvent, svc *s3.S3) {
     sendResponse(response)
 }
 
-// func sendResponse(response interface{}) {
-//     jsonResponse, err := json.Marshal(response)
-//     if err != nil {
-//         log.Fatalf("Failed to marshal response: %v", err)
-//     }
-//     fmt.Println(string(jsonResponse))
-// }
-
 func sendResponse(response interface{}) {
     if completeEvent, ok := response.(CompleteEvent); ok {
         if completeEvent.Error.Code == 0 && completeEvent.Error.Message == "" {
@@ -201,6 +216,7 @@ func sendResponse(response interface{}) {
 }
 
 func main() {
+    
     scanner := bufio.NewScanner(os.Stdin)
 
     sess := session.Must(session.NewSession(&aws.Config{

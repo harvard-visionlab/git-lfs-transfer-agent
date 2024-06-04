@@ -14,6 +14,7 @@ import (
 func TestAgent(t *testing.T) {
     // Setup the environment variables
     env := []string{
+        "LFS_LOGGING=true",
         "LFS_AWS_PROFILE=wasabi",
         "LFS_AWS_ENDPOINT=s3.wasabisys.com",
         "LFS_AWS_USER=alvarez",
