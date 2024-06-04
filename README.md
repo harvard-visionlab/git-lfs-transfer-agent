@@ -36,6 +36,11 @@ Run tests..
 go test -v
 ```
 
+Check remote file metadata
+```
+aws s3api head-object --bucket visionlab-members --key alvarez/test-b1715442aa.csv --profile wasabi
+```
+
 Ensure the LFS_API_KEY and LFS_LAMBDA_FINCTION_URL environment variables are set before performing LFS operations:
 ```
 export LFS_API_KEY=your-secret-api-key
