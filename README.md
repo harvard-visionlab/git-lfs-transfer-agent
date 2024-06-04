@@ -42,15 +42,13 @@ aws s3api head-object --bucket visionlab-members --key alvarez/test-b1715442aa.c
 ```
 
 Ensure the LFS_API_KEY and LFS_LAMBDA_FINCTION_URL environment variables are set before performing LFS operations:
-```
-export LFS_API_KEY=your-secret-api-key
-export LFS_LAMBDA_FINCTION_URL=url-to-your-lfs-s3-lambda function
-```
 
 ```
 export LFS_AWS_PROFILE=wasabi
-export LFS_AWS_ENDPOINT=s3.wasabisys.com
+export LFS_AWS_ENDPOINT=https://s3.wasabisys.com
 export LFS_AWS_USER=alvarez
 export LFS_AWS_REGION=us-east-1
-export LFS_LOCAL_STORAGE=/path/to/local/storage
+export LFS_S3_BUCKET=visionlab-members
+export LFS_LOGGING=true
+export LFS_HASH_LENGTH=16
 ```

@@ -21,6 +21,7 @@ func TestAgent(t *testing.T) {
         "LFS_AWS_REGION=us-east-1",
         "LFS_S3_BUCKET=visionlab-members",
         "LFS_LOCAL_STORAGE=./lfs_cache",
+        "LFS_HASH_LENGTH=16",
     }
 
     // Ensure the local storage directory exists
@@ -168,7 +169,7 @@ func TestAgent(t *testing.T) {
     }
 
     // Verify the downloaded file
-    downloadedFile := filepath.Join("./lfs_cache", "b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815", "test-b1715442aa.csv")
+    downloadedFile := filepath.Join("./lfs_cache", "b1715442aab3c9c4", "test-b1715442aa.csv")
     downloadedContent, err := os.ReadFile(downloadedFile)
     if err != nil {
         t.Fatalf("Failed to read downloaded file: %v", err)

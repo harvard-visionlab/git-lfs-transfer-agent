@@ -10,7 +10,8 @@ import (
     "log"
     "os"
     "path/filepath"
-
+    "strconv"
+    
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/credentials"
     "github.com/aws/aws-sdk-go/aws/session"
@@ -200,6 +201,20 @@ func computeSHA256(filePath string) (string, error) {
     return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
+// Helper function to get the hash length from the environment variable or default to 16
+func getHashLength() int {
+    hashLengthStr := os.Getenv("LFS_HASH_LENGTH")
+    if hashLengthStr == "" {
+        return 16
+    }
+
+    hashLength, err := strconv.Atoi(hashLengthStr)
+    if err != nil {
+        return 16
+    }
+    return hashLength
+}
+
 // Helper function to update the metadata of an S3 object
 func updateS3ObjectMetadata(svc *s3.S3, bucket, key, sha256Hash string) error {
     _, err := svc.CopyObject(&s3.CopyObjectInput{
@@ -258,7 +273,9 @@ func handleDownload(event TransferEvent, svc *s3.S3) {
     if localStorage == "" {
         localStorage = defaultLfsStorage
     }
-
+    
+    hashLength := getHashLength()
+    
     // Compute the file path for checking the S3 object
     key := fmt.Sprintf("%s/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
     headObjOutput, err := svc.HeadObject(&s3.HeadObjectInput{
@@ -289,9 +306,12 @@ func handleDownload(event TransferEvent, svc *s3.S3) {
             handleError(event, fmt.Errorf("failed to compute SHA-256 hash of file %q: %v", tmpPath, err))
             return
         }
-
+        
+        // Use truncated SHA-256 hash for the cache path
+        truncatedSHA256 := localSHA256[:hashLength]
+        
         // Move the file to the correct local path
-        localPath = filepath.Join(localStorage, localSHA256, event.Oid)
+        localPath = filepath.Join(localStorage, truncatedSHA256, event.Oid)
         err = os.MkdirAll(filepath.Dir(localPath), os.ModePerm)
         if err != nil {
             handleError(event, fmt.Errorf("failed to create directory for file %q: %v", localPath, err))
@@ -313,7 +333,8 @@ func handleDownload(event TransferEvent, svc *s3.S3) {
 
     } else {
         // If the remote SHA-256 is not nil, compare it with the local file's hash
-        localPath = filepath.Join(localStorage, *remoteSHA256, event.Oid)
+        truncatedSHA256 := (*remoteSHA256)[:hashLength]
+        localPath = filepath.Join(localStorage, truncatedSHA256, event.Oid)
         localFileInfo, err := os.Stat(localPath)
         if err == nil && localFileInfo.Size() == event.Size {
             // Compute the SHA-256 hash of the local file
