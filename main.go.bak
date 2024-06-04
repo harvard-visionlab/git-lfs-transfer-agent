@@ -1,0 +1,131 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+)
+
+type TransferRequest struct {
+	Event      string `json:"event"`
+	Operation  string `json:"operation"`
+	Remote     string `json:"remote"`
+	Concurrent bool   `json:"concurrent"`
+	Objects    []struct {
+		Oid  string `json:"oid"`
+		Size int64  `json:"size"`
+		Path string `json:"path,omitempty"`
+	} `json:"objects"`
+}
+
+type TransferResponse struct {
+	Objects []struct {
+		Oid     string `json:"oid"`
+		Actions struct {
+			Download struct {
+				Href   string            `json:"href"`
+				Header map[string]string `json:"header"`
+			} `json:"download,omitempty"`
+			Upload struct {
+				Href   string            `json:"href"`
+				Header map[string]string `json:"header"`
+			} `json:"upload,omitempty"`
+		} `json:"actions"`
+	} `json:"objects"`
+}
+
+func main() {
+	log.Println("Starting lfs-transfer-agent")
+	decoder := json.NewDecoder(os.Stdin)
+	encoder := json.NewEncoder(os.Stdout)
+
+	for {
+		var req TransferRequest
+		if err := decoder.Decode(&req); err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatalf("Error decoding request: %v", err)
+		}
+
+		log.Printf("Received request: %+v", req)
+
+		switch req.Event {
+		case "init":
+			handleInit(req, encoder)
+		case "upload":
+			handleUpload(req, encoder)
+		case "terminate":
+			handleTerminate()
+		default:
+			log.Printf("Unknown event: %s", req.Event)
+		}
+	}
+
+	log.Println("lfs-transfer-agent finished")
+}
+
+func handleInit(req TransferRequest, encoder *json.Encoder) {
+	log.Println("Handling init event")
+	response := map[string]interface{}{}
+	if err := encoder.Encode(response); err != nil {
+		log.Fatalf("Error encoding init response: %v", err)
+	}
+}
+
+func handleUpload(req TransferRequest, encoder *json.Encoder) {
+	log.Println("Handling upload event")
+	lambdaUrl := os.Getenv("LFS_LAMBDA_FUNCTION_URL")
+	apiKey := os.Getenv("LFS_API_KEY")
+	if lambdaUrl == "" || apiKey == "" {
+		log.Fatalf("LFS_LAMBDA_FUNCTION_URL or LFS_API_KEY environment variable is not set")
+	}
+
+	for _, obj := range req.Objects {
+		log.Printf("Processing upload for object: %s", obj.Oid)
+
+		actionUrl := fmt.Sprintf("%s?oid=%s", lambdaUrl, obj.Oid)
+		log.Printf("Prepared action URL: %s", actionUrl)
+
+		request, err := http.NewRequest("POST", actionUrl, nil)
+		if err != nil {
+			log.Fatalf("Error creating HTTP request: %v", err)
+		}
+		request.Header.Set("x-api-key", apiKey)
+
+		log.Printf("Sending HTTP request: %s", request.URL.String())
+		for k, v := range request.Header {
+			log.Printf("Header: %s: %s", k, v)
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(request)
+		if err != nil {
+			log.Fatalf("Error executing HTTP request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		log.Printf("Received HTTP response: %s", resp.Status)
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			log.Fatalf("Error response from server: %s", body)
+		}
+
+		response := map[string]interface{}{
+			"event": "complete",
+			"oid":   obj.Oid,
+		}
+
+		if err := encoder.Encode(response); err != nil {
+			log.Fatalf("Error encoding upload response: %v", err)
+		}
+
+		log.Printf("Upload for object %s complete", obj.Oid)
+	}
+}
+
+func handleTerminate() {
+	log.Println("Handling terminate event")
+}

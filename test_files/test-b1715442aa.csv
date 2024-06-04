@@ -1,0 +1,2 @@
+layer_name,model_name,hash_id,top1,top5,snr_mean,snr_sqrt_mean_squared,snr_min,snr_max,snr_kurtosis,snr_sqrt_kurtosis
+output,alexnet_in1k_supervised,7be5be79,56.554,79.086,2.200240822254723,1.7968349867133286,3.3717478800099343e-06,22.377113342285156,4.361312437852895,0.011943824497893551
