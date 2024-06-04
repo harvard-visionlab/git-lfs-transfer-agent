@@ -41,15 +41,18 @@ go test -v
 
 Then set the following Git LFS configuration in your repository: 
 ```
-git config lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-transfer-agent
+git config lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-s3-agent
 git config lfs.customtransfer.lfs-agent.args ""
 git config lfs.customtransfer.lfs-agent.concurrent true
-git config lfs.standalonetransferagent lfs-agent
+git config lfs.standalonetransferagent lfs-s3-agent
 ```
 
 Check remote file metadata
 ```
 aws s3api head-object --bucket visionlab-members --key alvarez/test-b1715442aa.csv --profile wasabi
+aws s3api head-object --bucket visionlab-members --key alvarez/b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815 --profile wasabi
+
+
 ```
 
 # TODO

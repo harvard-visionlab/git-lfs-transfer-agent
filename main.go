@@ -66,20 +66,10 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
     // Compute local file's SHA-256 hash
     localSHA256, err := computeSHA256(event.Path)
     if err != nil {
-        response := CompleteEvent{
-            Event: "complete",
-            Oid:   event.Oid,
-            Error: struct {
-                Code    int    `json:"code"`
-                Message string `json:"message"`
-            }{
-                Code:    1,
-                Message: fmt.Sprintf("Failed to compute SHA-256 hash of file %q: %v", event.Path, err),
-            },
-        }
-        sendResponse(response)
+        handleError(event, fmt.Errorf("failed to compute SHA-256 hash of file %q: %v", event.Path, err))
         return
     }
+    // log.Printf("Computed SHA-256 hash: %s\n", localSHA256)
     
     // Check if the object already exists
     key := fmt.Sprintf("%s/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
@@ -108,39 +98,13 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
     // Proceed to upload the object
     file, err := os.Open(event.Path)
     if err != nil {
-        response := CompleteEvent{
-            Event: "complete",
-            Oid:   event.Oid,
-            Error: struct {
-                Code    int    `json:"code"`
-                Message string `json:"message"`
-            }{
-                Code:    1,
-                Message: fmt.Sprintf("Failed to open file %q: %v", event.Path, err),
-            },
-        }
-        sendResponse(response)
+        handleError(event, fmt.Errorf("failed to open file %q: %v", event.Path, err))
         return
     }
     defer file.Close()
 
-    // Compute SHA-256 hash for the upload
-    // sha256Hash, err := computeSHA256(event.Path)
-    if err != nil {
-        response := CompleteEvent{
-            Event: "complete",
-            Oid:   event.Oid,
-            Error: struct {
-                Code    int    `json:"code"`
-                Message string `json:"message"`
-            }{
-                Code:    1,
-                Message: fmt.Sprintf("Failed to compute SHA-256 hash of file %q: %v", event.Path, err),
-            },
-        }
-        sendResponse(response)
-        return
-    }
+    /// Log when the upload starts
+    log.Printf("Uploading file %s to s3://%s/%s\n", event.Path, os.Getenv("LFS_S3_BUCKET"), key)
 
     _, err = svc.PutObject(&s3.PutObjectInput{
         Bucket: aws.String(os.Getenv("LFS_S3_BUCKET")),
@@ -151,20 +115,12 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
         },
     })
     if err != nil {
-        response := CompleteEvent{
-            Event: "complete",
-            Oid:   event.Oid,
-            Error: struct {
-                Code    int    `json:"code"`
-                Message string `json:"message"`
-            }{
-                Code:    1,
-                Message: fmt.Sprintf("Failed to upload data to %s/%s: %v", os.Getenv("LFS_S3_BUCKET"), key, err),
-            },
-        }
-        sendResponse(response)
+        handleError(event, fmt.Errorf("failed to upload data to %s/%s: %v", os.Getenv("LFS_S3_BUCKET"), key, err))
         return
     }
+    
+    // Log when the upload is successful
+    log.Printf("Successfully uploaded file %s to s3://%s/%s\n", event.Path, os.Getenv("LFS_S3_BUCKET"), key)
 
     response := CompleteEvent{Event: "complete", Oid: event.Oid}
     sendResponse(response)
@@ -465,6 +421,7 @@ func sendResponse(response interface{}) {
             if err != nil {
                 log.Fatalf("Failed to marshal response: %v", err)
             }
+            log.Printf("Sending response without error: %s", string(jsonResponse)) // Add this line for logging
             fmt.Println(string(jsonResponse))
             return
         }
@@ -474,6 +431,7 @@ func sendResponse(response interface{}) {
     if err != nil {
         log.Fatalf("Failed to marshal response: %v", err)
     }
+    log.Printf("Sending response with error: %s", string(jsonResponse)) // Add this line for logging
     fmt.Println(string(jsonResponse))
 }
 
