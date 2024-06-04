@@ -1,6 +1,8 @@
 package main
 
 import (
+    "crypto/sha256"
+    "encoding/hex"
     "bufio"
     "encoding/json"
     "fmt"
@@ -53,9 +55,30 @@ func handleInit(event InitEvent) {
 
 func handleUpload(event TransferEvent, svc *s3.S3) {
     loggingEnabled := os.Getenv("LFS_LOGGING") == "true"
-    
+
     // Set log output to stdout
     log.SetOutput(os.Stdout)
+
+    // Log the loggingEnabled status
+    // log.Printf("loggingEnabled %t \n", loggingEnabled)
+    
+    // Compute local file's SHA-256 hash
+    localSHA256, err := computeSHA256(event.Path)
+    if err != nil {
+        response := CompleteEvent{
+            Event: "complete",
+            Oid:   event.Oid,
+            Error: struct {
+                Code    int    `json:"code"`
+                Message string `json:"message"`
+            }{
+                Code:    1,
+                Message: fmt.Sprintf("Failed to compute SHA-256 hash of file %q: %v", event.Path, err),
+            },
+        }
+        sendResponse(response)
+        return
+    }
     
     // Check if the object already exists
     key := fmt.Sprintf("%s/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
@@ -65,14 +88,20 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
     }
 
     headObjOutput, err := svc.HeadObject(headObjInput)
-    if err == nil && *headObjOutput.ContentLength == event.Size {
-        if loggingEnabled {
-            log.Printf("oid %s already exists at key %s, skipping upload\n", event.Oid, key)
+    if err == nil {
+        // Get the SHA-256 hash from metadata
+        remoteSHA256 := headObjOutput.Metadata["Sha256"]
+
+        // Compare hashes
+        if remoteSHA256 != nil && *remoteSHA256 == localSHA256 {
+            if loggingEnabled {
+                log.Printf("oid %s already exists at key %s with matching SHA-256, skipping upload\n", event.Oid, key)
+            }
+            // The object exists and the hash matches, no need to upload
+            response := CompleteEvent{Event: "complete", Oid: event.Oid}
+            sendResponse(response)
+            return
         }
-        // The object exists and the size matches, no need to upload
-        response := CompleteEvent{Event: "complete", Oid: event.Oid}
-        sendResponse(response)
-        return
     }
 
     // Proceed to upload the object
@@ -94,10 +123,31 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
     }
     defer file.Close()
 
+    // Compute SHA-256 hash for the upload
+    // sha256Hash, err := computeSHA256(event.Path)
+    if err != nil {
+        response := CompleteEvent{
+            Event: "complete",
+            Oid:   event.Oid,
+            Error: struct {
+                Code    int    `json:"code"`
+                Message string `json:"message"`
+            }{
+                Code:    1,
+                Message: fmt.Sprintf("Failed to compute SHA-256 hash of file %q: %v", event.Path, err),
+            },
+        }
+        sendResponse(response)
+        return
+    }
+
     _, err = svc.PutObject(&s3.PutObjectInput{
         Bucket: aws.String(os.Getenv("LFS_S3_BUCKET")),
         Key:    aws.String(key),
         Body:   file,
+        Metadata: map[string]*string{
+            "Sha256": aws.String(localSHA256),
+        },
     })
     if err != nil {
         response := CompleteEvent{
@@ -119,13 +169,47 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
     sendResponse(response)
 }
 
+func computeSHA256(filePath string) (string, error) {
+    file, err := os.Open(filePath)
+    if err != nil {
+        return "", err
+    }
+    defer file.Close()
+
+    hasher := sha256.New()
+    if _, err := io.Copy(hasher, file); err != nil {
+        return "", err
+    }
+
+    return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
 func handleDownload(event TransferEvent, svc *s3.S3) {
+    loggingEnabled := os.Getenv("LFS_LOGGING") == "true"
+    
+    // Set log output to stdout
+    log.SetOutput(os.Stdout)
+    
     localStorage := os.Getenv("LFS_LOCAL_STORAGE")
     if localStorage == "" {
         localStorage = defaultLfsStorage
     }
 
     localPath := filepath.Join(localStorage, event.Oid)
+
+    // Check if the local file exists and its size
+    localFileInfo, err := os.Stat(localPath)
+    if err == nil && localFileInfo.Size() == event.Size {
+        if loggingEnabled {
+            log.Printf("oid %s already exists at localPath %s, skipping download\n", event.Oid, localPath)
+        }
+        // Local file exists and sizes match, skip download
+        response := CompleteEvent{Event: "complete", Oid: event.Oid, Path: localPath}
+        sendResponse(response)
+        return
+    }
+
+    // Proceed to download the object
     file, err := os.Create(localPath)
     if err != nil {
         response := CompleteEvent{
