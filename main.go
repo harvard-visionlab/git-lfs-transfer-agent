@@ -164,7 +164,35 @@ func handleDownload(event TransferEvent, svc *s3.S3) {
     sendResponse(response)
 }
 
+// func sendResponse(response interface{}) {
+//     jsonResponse, err := json.Marshal(response)
+//     if err != nil {
+//         log.Fatalf("Failed to marshal response: %v", err)
+//     }
+//     fmt.Println(string(jsonResponse))
+// }
+
 func sendResponse(response interface{}) {
+    if completeEvent, ok := response.(CompleteEvent); ok {
+        if completeEvent.Error.Code == 0 && completeEvent.Error.Message == "" {
+            // Marshal without the Error field
+            jsonResponse, err := json.Marshal(struct {
+                Event string `json:"event"`
+                Oid   string `json:"oid"`
+                Path  string `json:"path,omitempty"`
+            }{
+                Event: completeEvent.Event,
+                Oid:   completeEvent.Oid,
+                Path:  completeEvent.Path,
+            })
+            if err != nil {
+                log.Fatalf("Failed to marshal response: %v", err)
+            }
+            fmt.Println(string(jsonResponse))
+            return
+        }
+    }
+
     jsonResponse, err := json.Marshal(response)
     if err != nil {
         log.Fatalf("Failed to marshal response: %v", err)
