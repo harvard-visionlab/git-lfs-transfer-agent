@@ -134,3 +134,4 @@ aws s3api head-object --bucket visionlab-members --key alvarez/b1715442aab3c9c44
 
 # TODO
 - [ ] rename this repo git-lfs-s3-agent
+- [ ] add LFS_BUCKET_CACHE_DIR to override default LFS_S3_BUCKET/LFS_AWS_USER/git_lfs location
