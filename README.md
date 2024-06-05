@@ -54,6 +54,15 @@ git config lfs.customtransfer.lfs-agent.concurrent true
 git config lfs.standalonetransferagent lfs-s3-agent
 ```
 
+or globally
+```
+git config --global lfs.storage "$LFS_CACHE_DIR"
+git config --global lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-s3-agent
+git config --global lfs.customtransfer.lfs-agent.args ""
+git config --global lfs.customtransfer.lfs-agent.concurrent true
+git config --global lfs.standalonetransferagent lfs-s3-agent
+```
+
 check the settings
 ```
 git lfs env

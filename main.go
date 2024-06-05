@@ -236,149 +236,34 @@ func parseHref(href string) (string, string, string, error) {
 
 func handleDownload(event TransferEvent, svc *s3.S3) {
     loggingEnabled := os.Getenv("LFS_LOGGING") == "true"
-    
-    // Set log output to stdout
-    // log.SetOutput(os.Stdout)
-    
+
     if loggingEnabled {
-        fmt.Printf("Received download event: %+v\n", event)
+        fmt.Fprintf(os.Stderr, "==> Received download event: %+v\n", event)
     }
     
-    localStorage := os.Getenv("LFS_LOCAL_STORAGE")
+    // Temporarily store the file in the LFS_CACHE_DIR/tmp folder
+    localStorage := os.Getenv("LFS_CACHE_DIR")
     if localStorage == "" {
         localStorage = defaultLfsStorage
     }
+    tempFile := filepath.Join(localStorage, "tmp", event.Oid)
     
-    // parse the href to get the bucket key, filename, oid (sha256)
-    href := event.Action.Href
-    key, filename, oid, err := parseHref(href)
-    if err != nil {
-        handleError(event, fmt.Errorf("failed to parse href from %s: %v", href, err))
-        return
-    }
-    // if loggingEnabled {
-    //     fmt.Printf("key: %s, filename: %s, oid: %s\n", key, filename, oid)
-    // }
+    // Download the object from the bucket
+    bucket := os.Getenv("LFS_S3_BUCKET")
+    key := fmt.Sprintf("%s/git_lfs/objects/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
     
-    // key ends with sha-256 hash
-    remoteSHA256 := oid 
-
-    // compare remote id with truncated version of oid
-    hashLength := getHashLength()
-    truncatedSHA256 := remoteSHA256[:hashLength]
-    localPath := filepath.Join(localStorage, truncatedSHA256, filename)
-    localFileInfo, err := os.Stat(localPath)
-    if err == nil && localFileInfo.Size() == event.Size {
-        // Compute the SHA-256 hash of the local file
-        localSHA256, err := computeSHA256(localPath)
-        if err == nil && remoteSHA256 == localSHA256 {
-            if loggingEnabled {
-                log.Printf("oid %s already exists at localPath %s, skipping download\n", event.Oid, localPath)
-            }                
-            // The local file exists, sizes match, and the hashes match, so skip the download
-            response := CompleteEvent{Event: "complete", Oid: event.Oid, Path: localPath}
-            sendResponse(response)
-            return
-        }
+    if loggingEnabled {
+        fmt.Fprintf(os.Stderr, "==> Downloading file from s3://%s/%s to %s\n", bucket, key, tempFile)
     }
-
-    // Proceed to download the file
-    err = downloadFileFromS3(svc, os.Getenv("LFS_S3_BUCKET"), key, localPath)
+    err := downloadFileFromS3(svc, bucket, key, tempFile)
     if err != nil {
         handleError(event, err)
         return
     }
 
-    response := CompleteEvent{Event: "complete", Oid: event.Oid, Path: localPath}
+    response := CompleteEvent{Event: "complete", Oid: event.Oid, Path: tempFile}
     sendResponse(response)
 }
-
-// func handleDownload(event TransferEvent, svc *s3.S3) {
-//     loggingEnabled := os.Getenv("LFS_LOGGING") == "true"
-    
-//     // Set log output to stdout
-//     log.SetOutput(os.Stdout)
-    
-//     localStorage := os.Getenv("LFS_LOCAL_STORAGE")
-//     if localStorage == "" {
-//         localStorage = defaultLfsStorage
-//     }
-
-//     localPath := filepath.Join(localStorage, event.Oid)
-
-//     // Check if the local file exists and its size
-//     localFileInfo, err := os.Stat(localPath)
-//     if err == nil && localFileInfo.Size() == event.Size {
-//         if loggingEnabled {
-//             log.Printf("oid %s already exists at localPath %s, skipping download\n", event.Oid, localPath)
-//         }
-//         // Local file exists and sizes match, skip download
-//         response := CompleteEvent{Event: "complete", Oid: event.Oid, Path: localPath}
-//         sendResponse(response)
-//         return
-//     }
-
-//     // Proceed to download the object
-//     file, err := os.Create(localPath)
-//     if err != nil {
-//         response := CompleteEvent{
-//             Event: "complete",
-//             Oid:   event.Oid,
-//             Error: struct {
-//                 Code    int    `json:"code"`
-//                 Message string `json:"message"`
-//             }{
-//                 Code:    1,
-//                 Message: fmt.Sprintf("Failed to create file %q: %v", localPath, err),
-//             },
-//         }
-//         sendResponse(response)
-//         return
-//     }
-//     defer file.Close()
-
-//     key := fmt.Sprintf("%s/%s", os.Getenv("LFS_AWS_USER"), event.Oid)
-//     output, err := svc.GetObject(&s3.GetObjectInput{
-//         Bucket: aws.String(os.Getenv("LFS_S3_BUCKET")),
-//         Key:    aws.String(key),
-//     })
-//     if err != nil {
-//         response := CompleteEvent{
-//             Event: "complete",
-//             Oid:   event.Oid,
-//             Error: struct {
-//                 Code    int    `json:"code"`
-//                 Message string `json:"message"`
-//             }{
-//                 Code:    1,
-//                 Message: fmt.Sprintf("Failed to download data from %s/%s: %v", os.Getenv("LFS_S3_BUCKET"), key, err),
-//             },
-//         }
-//         sendResponse(response)
-//         return
-//     }
-//     defer output.Body.Close()
-
-//     _, err = io.Copy(file, output.Body)
-//     if err != nil {
-//         response := CompleteEvent{
-//             Event: "complete",
-//             Oid:   event.Oid,
-//             Error: struct {
-//                 Code    int    `json:"code"`
-//                 Message string `json:"message"`
-//             }{
-//                 Code:    1,
-//                 Message: fmt.Sprintf("Failed to write data to file %q: %v", localPath, err),
-//             },
-//         }
-//         sendResponse(response)
-//         return
-//     }
-
-//     response := CompleteEvent{Event: "complete", Oid: event.Oid, Path: localPath}
-//     sendResponse(response)
-// }
 
 func sendResponse(response interface{}) {
     if completeEvent, ok := response.(CompleteEvent); ok {
