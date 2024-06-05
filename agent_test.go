@@ -5,11 +5,39 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
+    "strings"
     "os"
     "os/exec"
     "path/filepath"
     "testing"
 )
+
+// getFilenameFromOid runs the git log command and parses the result to get the filename
+func getFilenameFromOid(repoPath, oid string) (string, error) {
+	// Construct the command
+	cmd := exec.Command("git", "log", "-G", fmt.Sprintf("oid sha256:%s", oid), "--name-status")
+	cmd.Dir = repoPath // Set the directory to the repository path
+
+	// Run the command and capture the output
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("failed to run git log command: %v", err)
+	}
+
+	// Parse the output to find the filename
+	lines := strings.Split(out.String(), "\n")
+	for _, line := range lines {
+		// Find lines starting with 'A' (for added files)
+		if strings.HasPrefix(line, "A\t") {
+			filename := strings.TrimSpace(strings.TrimPrefix(line, "A"))
+			return filename, nil
+		}
+	}
+
+	return "", fmt.Errorf("filename not found for oid: %s", oid)
+}
 
 func TestAgent(t *testing.T) {
     // Setup the environment variables
@@ -42,14 +70,14 @@ func TestAgent(t *testing.T) {
     // Prepare the upload event
     uploadEvent := map[string]interface{}{
         "event": "upload",
-        "oid":   "test-b1715442aa.csv",
+        "oid":   "b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815",
         "size":  len(content),
         "path":  testFile,
         "action": map[string]interface{}{
-            "href": "s3://visionlab-members/alvarez/test-b1715442aa.csv",
+            "href": "s3://visionlab-members/alvarez/test_files/test-b1715442aa.csv/b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815",
         },
     }
-
+    // {Event:upload Oid:b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815 Size:290 Path:/home/jovyan/work/GitHub/lfs-s3-playground/lfs_cache/objects/b1/71/b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815 Action:{Href: Header:map[]}}
     uploadEventBytes, err := json.Marshal(uploadEvent)
     if err != nil {
         t.Fatalf("Failed to marshal upload event: %v", err)
@@ -107,10 +135,10 @@ func TestAgent(t *testing.T) {
     // Prepare the download event
     downloadEvent := map[string]interface{}{
         "event": "download",
-        "oid":   "test-b1715442aa.csv",
+        "oid":   "b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815",
         "size":  len(content),
         "action": map[string]interface{}{
-            "href": "s3://visionlab-members/alvarez/test-b1715442aa.csv",
+            "href": "s3://visionlab-members/alvarez/test_files/test-b1715442aa.csv/b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815",
         },
     }
 
@@ -178,7 +206,12 @@ func TestAgent(t *testing.T) {
     if !bytes.Equal(content, downloadedContent) {
         t.Fatalf("Downloaded file content does not match original content")
     }
-
+    
+    // filename
+    filename, err := getFilenameFromOid("/home/jovyan/work/GitHub/lfs-s3-playground",
+                                        "b1715442aab3c9c446e4ef884c5a9db61f745faa8a839513c6951f7ea1a1e815")
+    fmt.Printf("Recovered filename: %s\n", filename)
+    
     // Clean up the test file
     // os.Remove(downloadedFile)
 }

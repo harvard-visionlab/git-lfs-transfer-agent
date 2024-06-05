@@ -19,7 +19,10 @@ sudo chmod +x /usr/local/bin/lfs-s3-agent
 
 Ensure the LFS_API_KEY and LFS_LAMBDA_FINCTION_URL environment variables are set before performing LFS operations:
 
+`nano ~/.bash_profile`
+
 ```
+export LFS_CACHE_DIR=/home/jovyan/work/DataLocal/lfs-cache
 export LFS_AWS_PROFILE=wasabi
 export LFS_AWS_ENDPOINT=https://s3.wasabisys.com
 export LFS_AWS_USER=alvarez
@@ -27,9 +30,12 @@ export LFS_AWS_REGION=us-east-1
 export LFS_S3_BUCKET=visionlab-members
 ```
 
+```
+source ~/.bash_profile
+```
+
 optional
 ```
-export LFS_LOCAL_STORAGE='./lfs_cache'
 export LFS_LOGGING=true
 export LFS_HASH_LENGTH=16
 ```
@@ -41,10 +47,16 @@ go test -v
 
 Then set the following Git LFS configuration in your repository: 
 ```
+git config lfs.storage "$LFS_CACHE_DIR"
 git config lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-s3-agent
 git config lfs.customtransfer.lfs-agent.args ""
 git config lfs.customtransfer.lfs-agent.concurrent true
 git config lfs.standalonetransferagent lfs-s3-agent
+```
+
+check the settings
+```
+git lfs env
 ```
 
 Check remote file metadata
