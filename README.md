@@ -3,7 +3,53 @@ custom git-lfs-transfer-agent which uses an s3 bucket for lfs storage using the 
 
 (IN DEVELOPMENT...)
 
-# install
+# install git lfs
+https://github.com/git-lfs/git-lfs/releases
+
+Determine which version to download based on your system:
+```
+uname -m
+```
+
+x86_64 indicates an amd64 architecture.
+
+```
+cd ~/tmp
+wget -c https://github.com/git-lfs/git-lfs/releases/download/v3.5.1/git-lfs-linux-amd64-v3.5.1.tar.gz
+tar -xvzf git-lfs-linux-amd64-v3.5.1.tar.gz
+cd git-lfs-3.5.1
+PREFIX=$HOME/local ./install.sh
+```
+
+check installation
+```
+git lfs version
+```
+
+# make sure go is installed on your system
+```
+go version
+```
+
+If not go [here](https://go.dev/dl/) to download the latest binary:
+```
+cd ~/tmp
+wget -c https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
+tar -xzf go1.22.4.linux-amd64.tar.gz
+
+```
+
+append to bashrc `nano ~/.bashrc`
+```
+export PATH=$HOME/go/bin:$PATH
+```
+
+```
+source ~/.bashrc
+go version
+```
+
+# install git-lfs-transfer-agent
 
 ```
 git clone https://github.com/harvard-visionlab/git-lfs-transfer-agent.git
@@ -13,8 +59,18 @@ go get github.com/aws/aws-sdk-go/aws
 go get github.com/aws/aws-sdk-go/aws/session
 go get github.com/aws/aws-sdk-go/service/s3
 go build -o lfs-s3-agent main.go
+```
+
+Copy to /user/local/bin
+```
 sudo cp lfs-s3-agent /usr/local/bin/
 sudo chmod +x /usr/local/bin/lfs-s3-agent
+```
+
+or to `$HOME/local/bin`
+```
+cp lfs-s3-agent $HOME/local/bin
+chmod +x $HOME/local/bin/lfs-s3-agent
 ```
 
 Ensure the LFS_API_KEY and LFS_LAMBDA_FINCTION_URL environment variables are set before performing LFS operations:
@@ -37,7 +93,6 @@ source ~/.bash_profile
 optional
 ```
 export LFS_LOGGING=true
-export LFS_HASH_LENGTH=16
 ```
 
 Run tests..
@@ -57,9 +112,10 @@ git config lfs.standalonetransferagent lfs-s3-agent
 or globally
 ```
 git config --global lfs.storage "$LFS_CACHE_DIR"
-git config --global lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-s3-agent
-git config --global lfs.customtransfer.lfs-agent.args ""
-git config --global lfs.customtransfer.lfs-agent.concurrent true
+git config --global lfs.customtransfer.lfs-s3-agent.path /usr/local/bin/lfs-s3-agent
+git config --global lfs.customtransfer.lfs-s3-agent.path $HOME/local/bin/lfs-s3-agent
+git config --global lfs.customtransfer.lfs-s3-agent.args ""
+git config --global lfs.customtransfer.lfs-s3-agent.concurrent true
 git config --global lfs.standalonetransferagent lfs-s3-agent
 ```
 
