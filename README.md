@@ -73,10 +73,9 @@ cp lfs-s3-agent $HOME/local/bin
 chmod +x $HOME/local/bin/lfs-s3-agent
 ```
 
-Ensure the LFS_API_KEY and LFS_LAMBDA_FINCTION_URL environment variables are set before performing LFS operations:
+Ensure the LFS environment variables are set before performing LFS operations `nano ~/.bash_profile`:
 
-`nano ~/.bash_profile`
-
+Note that I'm setting the ACL for uploaded files to public-read by default so that I can share files with other users easily, but this can be set to "private" or omitted (private is the default).
 ```
 export LFS_CACHE_DIR=/home/jovyan/work/DataLocal/lfs-cache
 export LFS_AWS_PROFILE=wasabi
@@ -101,16 +100,10 @@ Run tests..
 go test -v
 ```
 
-Then set the following Git LFS configuration in your repository: 
-```
-git config lfs.storage "$LFS_CACHE_DIR"
-git config lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-s3-agent
-git config lfs.customtransfer.lfs-agent.args ""
-git config lfs.customtransfer.lfs-agent.concurrent true
-git config lfs.standalonetransferagent lfs-s3-agent
-```
+You need to configure git-lfs to use your custom-transfer agent, which you can do
+either globally (all repos), or locally in a single repo.
 
-or globally
+Global settings:
 ```
 git config --global lfs.storage "$LFS_CACHE_DIR"
 git config --global lfs.customtransfer.lfs-s3-agent.path /usr/local/bin/lfs-s3-agent
@@ -119,6 +112,17 @@ git config --global lfs.customtransfer.lfs-s3-agent.args ""
 git config --global lfs.customtransfer.lfs-s3-agent.concurrent true
 git config --global lfs.standalonetransferagent lfs-s3-agent
 ```
+
+Local settings
+```
+git config lfs.storage "$LFS_CACHE_DIR"
+git config lfs.customtransfer.lfs-agent.path /usr/local/bin/lfs-s3-agent
+git config lfs.customtransfer.lfs-agent.args ""
+git config lfs.customtransfer.lfs-agent.concurrent true
+git config lfs.standalonetransferagent lfs-s3-agent
+```
+
+
 
 check the settings
 ```
