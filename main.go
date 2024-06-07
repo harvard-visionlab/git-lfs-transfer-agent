@@ -102,7 +102,14 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
 
     /// Log when the upload starts
     fmt.Fprintf(os.Stderr, "Uploading file %s to s3://%s/%s\t", event.Path, os.Getenv("LFS_S3_BUCKET"), key)
-
+    
+    //  Get ACL, default to private 
+    acl := os.Getenv("LFS_ACL")
+    if acl == "" {
+        acl = "private"
+    }
+    
+    // Upload
     _, err = svc.PutObject(&s3.PutObjectInput{
         Bucket: aws.String(os.Getenv("LFS_S3_BUCKET")),
         Key:    aws.String(key),
@@ -110,6 +117,7 @@ func handleUpload(event TransferEvent, svc *s3.S3) {
         Metadata: map[string]*string{
             "Sha256": aws.String(event.Oid),
         },
+        ACL: aws.String(acl),
     })
     if err != nil {
         handleError(event, fmt.Errorf("failed to upload data to %s/%s: %v", os.Getenv("LFS_S3_BUCKET"), key, err))

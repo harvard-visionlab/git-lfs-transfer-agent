@@ -1,6 +1,4 @@
 .ipynb_checkpoints
-go.mod
-go.sum
 lfs-transfer-agent
 lfs-s3-agent
 

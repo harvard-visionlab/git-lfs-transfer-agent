@@ -84,6 +84,7 @@ export LFS_AWS_ENDPOINT=https://s3.wasabisys.com
 export LFS_AWS_USER=alvarez
 export LFS_AWS_REGION=us-east-1
 export LFS_S3_BUCKET=visionlab-members
+export LFS_ACL=public-read
 ```
 
 ```
